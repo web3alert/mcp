@@ -1,6 +1,6 @@
 # Web3alert MCP server
 
-Decoded on-chain events for AI agents. Connect an MCP client to Web3alert's hosted server, find a trigger in the catalog of EVM and Substrate chains (Ethereum, Polkadot, Kusama and more), subscribe your webhook to it, and receive each matching event as JSON, signed for webhooks added with a signing secret (every new one). Nothing to install: the server is hosted.
+Decoded on-chain events for AI agents. Connect an MCP client to Web3alert's hosted server, find a trigger in the catalog of EVM and Substrate chains (Ethereum, Polkadot, Kusama and more), subscribe your webhook to it, and receive each matching event as JSON, signed whenever the webhook has a signing secret (every new webhook gets one). Nothing to install: the server is hosted.
 
 | | |
 |---|---|
@@ -17,7 +17,7 @@ This repository describes the server and holds its registry entry ([`server.json
 1. A person signs in at [web3alert.io](https://web3alert.io) and copies the personal access token from the account page. Agents cannot open their own accounts yet.
 2. Point your MCP client at `https://web3alert.io/mcp/agent` and send the token in the `Authorization` header. The server accepts the token only in that header.
 
-**Claude Code**: this reads the token without echoing it or keeping it in shell history.
+**Claude Code**: this reads the token without echoing it or keeping it in shell history. Claude Code saves the header in its user configuration, so treat that file as a secret.
 
 ```bash
 printf 'Web3alert token: ' && read -rs WEB3ALERT_TOKEN && echo && [ -n "$WEB3ALERT_TOKEN" ] && claude mcp add --scope user --transport http web3alert-agent https://web3alert.io/mcp/agent --header "Authorization: Bearer $WEB3ALERT_TOKEN"
@@ -48,7 +48,7 @@ printf 'Web3alert token: ' && read -rs WEB3ALERT_TOKEN && echo && [ -n "$WEB3ALE
 | `get_trigger` | A trigger's runtime inputs, event fields and filterable fields: use it to learn which inputs a subscription must supply. | read |
 | `list_webhooks` | Webhook endpoints in the current workspace, with their signing status. | read |
 | `add_webhook` | Registers an HTTPS webhook endpoint and returns its signing secret once. | write |
-| `create_subscription` | Delivers one trigger to one webhook, with optional inputs and filter conditions. | write |
+| `create_subscription` | Delivers one trigger to one webhook, with the trigger's required inputs and optional filter conditions. | write |
 | `list_subscriptions` | Subscriptions in the current workspace. | read |
 | `set_subscription_state` | Pauses or resumes a subscription. | write |
 | `remove_subscription` | Deletes a subscription and stops its delivery. | write |
@@ -56,11 +56,11 @@ printf 'Web3alert token: ' && read -rs WEB3ALERT_TOKEN && echo && [ -n "$WEB3ALE
 
 Every tool declares an output schema, and a successful call returns `structuredContent`. A tool error returns `isError: true` with a JSON error (for example `subscription_limit_reached`, `not_found`, `rate_limited`) in its text content.
 
-A typical first session: `get_account` → `find_triggers` → `get_trigger` → `add_webhook` → `create_subscription` → `get_delivery_log`.
+A typical first session: `get_account` → `find_triggers` → `get_trigger` → `add_webhook` → `create_subscription` → `get_delivery_log`. To receive events you need a public HTTPS endpoint; `add_webhook` refuses a URL that carries a username or password.
 
 - `create_subscription` takes the trigger's required inputs and optional filter conditions. A create or a resume can succeed with `state: "blocked"` at the plan's subscription limit, so check that the returned `state` is `on` before you expect events. If a create got no reply, call `list_subscriptions` before retrying, or you may create a duplicate.
-- After a pause or removal, delivery stops within about 10 seconds; an attempt already due in that window can still arrive.
-- `get_delivery_log` follows the plan of the workspace's owner, not your own tier from `get_account`; on a plan without delivery history it returns `not_in_plan`.
+- After a pause or removal, pending retries stop within about 10 seconds; an attempt already due in that window can still arrive.
+- `get_delivery_log` follows the plan of the workspace's owner (your own plan only when the workspace has no recorded owner), not necessarily your tier from `get_account`; on a plan without delivery history it returns `not_in_plan`.
 
 Tools act on the account's current workspace, which you choose in the app. Adding a webhook, creating a subscription and reading delivery history need the `owner` or `admin` role in that workspace.
 
@@ -72,11 +72,11 @@ People who build catalog triggers use the full authoring server at `https://web3
 
 ## What your webhook receives
 
-Each delivery is a JSON body whose `id` (`evt_…`) stays the same across retries and equals the `webhook-id` header. Every delivery carries `webhook-id` and `webhook-timestamp` headers; endpoints with a signing secret also get `webhook-signature` per [Standard Webhooks](https://www.standardwebhooks.com/): `v1,` followed by the base64 HMAC-SHA256 of `webhook-id.webhook-timestamp.raw-body`, keyed with the base64-decoded part of the `whsec_…` secret.
+Each delivery is a JSON body whose `id` (`evt_…`) stays the same across retries and equals the `webhook-id` header. Every delivery carries `webhook-id` and `webhook-timestamp` headers; an endpoint that currently has a signing secret also gets `webhook-signature` per [Standard Webhooks](https://www.standardwebhooks.com/): `v1,` followed by the base64 HMAC-SHA256 of `webhook-id.webhook-timestamp.raw-body`, keyed with the base64-decoded part of the `whsec_…` secret.
 
-- Verify the signature against the raw body before parsing JSON, and reject a `webhook-timestamp` more than five minutes from your clock.
+- On a signed endpoint, verify the signature against the raw body before parsing JSON, and reject a `webhook-timestamp` more than five minutes from your clock. Moving a project to another workspace removes its webhooks' secrets; generate a new one if your receiver requires signatures.
 - Delivery is at least once: deduplicate by `webhook-id`.
-- Answer with a `2xx` within 4 seconds. HTTP `429`, `5xx`, timeouts and network errors before a response are retried, waiting at least 5 s, 1 min, 10 min, 1 h and 6 h between attempts (at most six attempts, spanning about 7 hours); other responses end the delivery, redirects are not followed, and test deliveries are never retried.
+- Answer with a `2xx` quickly: requests time out after 4 seconds by default. HTTP `429`, `5xx`, timeouts and network errors before a response are retried, waiting at least 5 s, 1 min, 10 min, 1 h and 6 h between attempts (at most six attempts, spanning about 7 hours). A failed delivery that cannot be queued for retry (queue full, or over 256 KB) is not retried. Other responses end the delivery, redirects are not followed, and test deliveries are never retried.
 - An HTTP `410` blocks the subscription at once. Five consecutive undelivered events for the same subscription and webhook block it too.
 - Each plan limits the delivery rate per subscription; events beyond the plan's queue can be dropped (see the [limits page](https://docs.web3alert.io/en/limits)).
 
