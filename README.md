@@ -1,6 +1,6 @@
 # Web3alert MCP server
 
-Decoded on-chain events for AI agents. Connect an MCP client to Web3alert's hosted server, find a trigger in the catalog of EVM and Substrate chains (Ethereum, Polkadot, Kusama and more), subscribe your webhook to it, and receive each matching event as signed JSON. Nothing to install: the server is hosted.
+Decoded on-chain events for AI agents. Connect an MCP client to Web3alert's hosted server, find a trigger in the catalog of EVM and Substrate chains (Ethereum, Polkadot, Kusama and more), subscribe your webhook to it, and receive each matching event as JSON, signed for webhooks added with a signing secret (every new one). Nothing to install: the server is hosted.
 
 | | |
 |---|---|
@@ -45,7 +45,7 @@ printf 'Web3alert token: ' && read -rs WEB3ALERT_TOKEN && echo && [ -n "$WEB3ALE
 |---|---|---|
 | `get_account` | Your account, tier, EUR wallet balance, tier limits, and subscription counts in the current workspace. | read |
 | `find_triggers` | Searches the published catalog and your workspace for triggers; paged with `cursor`. | read |
-| `get_trigger` | A trigger's runtime inputs, event fields and filterable fields, needed before subscribing. | read |
+| `get_trigger` | A trigger's runtime inputs, event fields and filterable fields: use it to learn which inputs a subscription must supply. | read |
 | `list_webhooks` | Webhook endpoints in the current workspace, with their signing status. | read |
 | `add_webhook` | Registers an HTTPS webhook endpoint and returns its signing secret once. | write |
 | `create_subscription` | Delivers one trigger to one webhook, with optional inputs and filter conditions. | write |
@@ -54,7 +54,13 @@ printf 'Web3alert token: ' && read -rs WEB3ALERT_TOKEN && echo && [ -n "$WEB3ALE
 | `remove_subscription` | Deletes a subscription and stops its delivery. | write |
 | `get_delivery_log` | Delivery history for the workspace or one subscription; paged with `cursor`. | read |
 
-Every tool returns structured content with an output schema. A typical first session: `get_account` → `find_triggers` → `get_trigger` → `add_webhook` → `create_subscription` → `get_delivery_log`.
+Every tool declares an output schema, and a successful call returns `structuredContent`. A tool error returns `isError: true` with a JSON error (for example `subscription_limit_reached`, `not_found`, `rate_limited`) in its text content.
+
+A typical first session: `get_account` → `find_triggers` → `get_trigger` → `add_webhook` → `create_subscription` → `get_delivery_log`.
+
+- `create_subscription` takes the trigger's required inputs and optional filter conditions. A create or a resume can succeed with `state: "blocked"` at the plan's subscription limit, so check that the returned `state` is `on` before you expect events. If a create got no reply, call `list_subscriptions` before retrying, or you may create a duplicate.
+- After a pause or removal, delivery stops within about 10 seconds; an attempt already due in that window can still arrive.
+- `get_delivery_log` follows the plan of the workspace's owner, not your own tier from `get_account`; on a plan without delivery history it returns `not_in_plan`.
 
 Tools act on the account's current workspace, which you choose in the app. Adding a webhook, creating a subscription and reading delivery history need the `owner` or `admin` role in that workspace.
 
@@ -68,16 +74,18 @@ People who build catalog triggers use the full authoring server at `https://web3
 
 Each delivery is a JSON body whose `id` (`evt_…`) stays the same across retries and equals the `webhook-id` header. Every delivery carries `webhook-id` and `webhook-timestamp` headers; endpoints with a signing secret also get `webhook-signature` per [Standard Webhooks](https://www.standardwebhooks.com/): `v1,` followed by the base64 HMAC-SHA256 of `webhook-id.webhook-timestamp.raw-body`, keyed with the base64-decoded part of the `whsec_…` secret.
 
+- Verify the signature against the raw body before parsing JSON, and reject a `webhook-timestamp` more than five minutes from your clock.
 - Delivery is at least once: deduplicate by `webhook-id`.
-- Answer with a `2xx` within 4 seconds. HTTP `429`, `5xx`, timeouts and network errors are retried after at least 5 s, 1 min, 10 min, 1 h and 6 h; other responses end the delivery, and redirects are not followed.
-- Five consecutive undelivered events block the subscription.
+- Answer with a `2xx` within 4 seconds. HTTP `429`, `5xx`, timeouts and network errors before a response are retried, waiting at least 5 s, 1 min, 10 min, 1 h and 6 h between attempts (at most six attempts, spanning about 7 hours); other responses end the delivery, redirects are not followed, and test deliveries are never retried.
+- An HTTP `410` blocks the subscription at once. Five consecutive undelivered events for the same subscription and webhook block it too.
+- Each plan limits the delivery rate per subscription; events beyond the plan's queue can be dropped (see the [limits page](https://docs.web3alert.io/en/limits)).
 
 The [Webhooks page](https://docs.web3alert.io/en/webhooks) has the payload, verification code in Node.js and Python, a test vector, and which responses are retried.
 
 ## Limits
 
 - Free: 5 active subscriptions to non-Free projects per account, across all workspaces; subscriptions to Free projects are exempt. Paid plans and their delivery-history retention are on the [limits page](https://docs.web3alert.io/en/limits).
-- 120 tool calls per minute per account on each server process. Over the budget, a tool returns `rate_limited` with `retryAfter` in seconds.
+- A default budget of 120 tool calls per minute per account on each server process, shared by both MCP endpoints and all of the account's tokens. Over the budget, a tool returns `rate_limited` with `retryAfter` in seconds.
 
 ## Coming soon
 
