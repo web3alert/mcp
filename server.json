@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.web3alert/agent",
+  "title": "Web3alert for agents",
+  "description": "Decoded on-chain events for AI agents: find triggers, subscribe a webhook, read delivery logs.",
+  "version": "0.1.0",
+  "websiteUrl": "https://web3alert.io",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://web3alert.io/mcp/agent",
+      "headers": [
+        {
+          "name": "Authorization",
+          "isRequired": true,
+          "isSecret": true,
+          "description": "Bearer <personal access token from the Web3alert Account page>"
+        }
+      ]
+    }
+  ]
+}
