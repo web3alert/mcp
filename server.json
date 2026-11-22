@@ -3,8 +3,24 @@
   "name": "io.web3alert/agent",
   "title": "Web3alert for agents",
   "description": "Decoded on-chain events for AI agents: find triggers, subscribe a webhook, read delivery logs.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://web3alert.io",
+  "icons": [
+    {
+      "src": "https://web3alert.io/icons/android-chrome-256x256.png",
+      "mimeType": "image/png",
+      "sizes": ["256x256"]
+    },
+    {
+      "src": "https://web3alert.io/icons/android-chrome-192x192.png",
+      "mimeType": "image/png",
+      "sizes": ["192x192"]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/web3alert/mcp",
+    "source": "github"
+  },
   "remotes": [
     {
       "type": "streamable-http",
@@ -12,9 +28,9 @@
       "headers": [
         {
           "name": "Authorization",
-          "isRequired": true,
+          "isRequired": false,
           "isSecret": true,
-          "description": "Bearer <personal access token from the Web3alert Account page>"
+          "description": "A Bearer personal access token from the Web3alert account page is required for tool calls. Listing tools works without it."
         }
       ]
     }
