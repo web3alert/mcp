@@ -50,7 +50,7 @@ Before paying, use `get_account` to confirm the key has the `spend` scope and th
 
 `get_topup_requirements` (needs the key's `manage` scope) returns a USDC quote and the x402 payment requirements; the agent then pays at `POST /api/billing/wallet/x402-topup`. Top-ups are €5–€500 in USDC on Base at the ECB reference rate with no markup; the quote rounds up to a USDC cent. Your agent signs the payment with its own wallet, and the facilitator pays the gas. [Agent quickstart and payment example](https://docs.web3alert.io/en/agents)
 
-If a signed top-up gets no reply, resend the request in the same workspace with the same body and saved `PAYMENT-SIGNATURE`. A fresh payment signature authorizes a separate payment. [x402 retry instructions](https://docs.web3alert.io/en/api-billing#post-api-billing-wallet-x402-topup)
+If a signed top-up gets no reply, times out, or returns `202` with `status: "pending"` or a `5xx`, resend the same request in the same workspace with the same body and saved `PAYMENT-SIGNATURE`, limiting retries to a few attempts and increasing the pause between them. Wait for the first payment's outcome to be confirmed before signing a new quote, because a fresh signature authorizes a separate payment. [x402 retry instructions](https://docs.web3alert.io/en/api-billing#post-api-billing-wallet-x402-topup)
 
 Once the EUR balance is credited, use `buy_plan` (needs the `spend` scope) to buy Advanced or Pro without auto-renewal. The key's optional monthly spend cap applies to balance purchases made with that key. Reuse the same `requestId` if you retry the purchase.
 
