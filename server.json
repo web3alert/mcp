@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.web3alert/agent",
   "title": "Web3alert for agents",
-  "description": "Decoded on-chain events for AI agents: find triggers, subscribe a webhook, read delivery logs.",
-  "version": "0.1.1",
+  "description": "Decoded on-chain events for AI agents: wallet sign-up, USDC top-ups, webhooks or an inbox.",
+  "version": "0.1.2",
   "websiteUrl": "https://web3alert.io",
   "icons": [
     {
@@ -30,7 +30,7 @@
           "name": "Authorization",
           "isRequired": false,
           "isSecret": true,
-          "description": "A Bearer personal access token from the Web3alert account page is required for tool calls. Listing tools works without it."
+          "description": "Create an agent key on the Agents page (https://web3alert.io/agents) and send Authorization: Bearer <key> for tool calls. Listing tools works without it. An agent can also get a key on its own by signing in with an Ethereum wallet; see https://web3alert.io/llms.txt."
         }
       ]
     }
