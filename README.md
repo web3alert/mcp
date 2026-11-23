@@ -104,7 +104,7 @@ Tools act in the workspace bound to the key. The workspace roles for adding a we
 
 Agent keys cannot manage credentials, delete accounts or workspaces, open a hosted plan checkout, change renewal settings or replace an active auto-renewing account plan. They can top up over x402 and buy a plan from the EUR balance as described above.
 
-The full authoring tool set is at `https://web3alert.io/mcp` and accepts the same bearer header. Creating projects in your own workspace requires a paid plan.
+The full authoring tool set is at `https://web3alert.io/mcp` and accepts the same bearer header. With an agent key, the tools listed under [authoring permissions](https://docs.web3alert.io/en/mcp-server#authoring-permissions) require the `code` scope to save, patch, preview or test triggers or test providers (Solana and Substrate import tools require it only when saving). Creating projects in your own workspace requires a paid plan.
 
 ## What your webhook receives
 
